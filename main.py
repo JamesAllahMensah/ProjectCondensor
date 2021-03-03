@@ -29,8 +29,26 @@ def upload_file(file_name, bucket, object_name=None):
     return file_path
 
 
+# Checks if the job name already exists
+def is_job_name_unique(job_name):
+    s3_client = boto3.client('transcribe')
+    transcription_jobs = s3_client.list_transcription_jobs()['TranscriptionJobSummaries']
+    for job in transcription_jobs:
+        if job['TranscriptionJobName'] == job_name and job['TranscriptionJobStatus'] == 'COMPLETED':
+            return False
+
+    return True
+
+
+
 # Starts the transcription job and returns a json file when complete
 def transcribe_file(job_name, file_uri, transcribe_client):
+
+    if is_job_name_unique(job_name):
+        error_msg = 'Job Name: {} already exists.'.format(job_name)
+        print(error_msg)
+        return
+
     transcribe_client.start_transcription_job(
         TranscriptionJobName=job_name,
         Media={'MediaFileUri': file_uri},
@@ -121,6 +139,7 @@ def main():
     print('Printing the output to a text file...')
     output_transcription(transcribed_data)
     print('Transcription Complete!')
+
 
 
 if __name__ == '__main__':
