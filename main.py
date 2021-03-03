@@ -59,8 +59,8 @@ def retrieve_audio():
                 print('{}: {}'.format(idx+1, val))
 
             selected_file = input('Please enter the file index (ex: 1) or the file name of the desired file (ex: {}):'.format(audio_files[0]))
-            if len(selected_file) == 1:
-                while int(selected_file) > len(audio_files):
+            if selected_file.isnumeric():
+                while int(selected_file) > len(audio_files) or int(selected_file) > 0 :
                     selected_file = input(
                         'Please enter the file index (ex: 1) or the file name of the desired file (ex: {}):'.format(
                             audio_files[0]))
