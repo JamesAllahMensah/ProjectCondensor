@@ -8,6 +8,8 @@ import json
 import logging
 import glob, os
 import pathlib
+import math
+import time
 
 
 # Author: James (Jimmy) Allah-Mensah
@@ -212,6 +214,10 @@ def correlate_speakers(transcription_response):
 
         for segment in data['results']['speaker_labels']['segments']:
             num_words = len(segment['items'])
+            start_time = segment['start_time']
+            end_time = segment['end_time']
+            timestamp = str(time.strftime('%H:%M:%S', time.gmtime(round(float(start_time))))) + ' - ' \
+            + str(time.strftime('%H:%M:%S', time.gmtime(round(float(end_time)))))
             speaker = segment['speaker_label'].replace("spk_", "Speaker ")
             speaker = speaker.split(" ")[0] + " " + str(int(speaker[len(speaker) - 1]) + 1) + ":"
             segment_text = word_list[counter:counter + num_words]
@@ -219,24 +225,24 @@ def correlate_speakers(transcription_response):
             script = ''
             for x in segment_text:
                 script += x + ' '
-            full_transcription.append((speaker, script.rstrip()))
+            full_transcription.append((speaker, script.rstrip(), timestamp))
             counter = counter + num_words
 
         for i in full_transcription:
-            print(i[0])
+            print(i[0].replace(":", " [") + i[2] + "]:")
             print(i[1] + "\n")
         return full_transcription
 
 
 # Writes the formatted transcription to a text file
-def output_transcription(transcribed_data):
+def output_transcription(transcribed_data, job_name):
     if transcribed_data is None:
         return False
 
     print('Printing the output to a text file...')
-    f = open("Output.txt", "w")
+    f = open("{}.txt".format(job_name), "w")
     for i in transcribed_data:
-        f.write(i[0] + "\n")
+        f.write(i[0].replace(":", " [") + i[2] + "]:" + "\n")
         f.write(i[1] + "\n")
         f.write("\n")
     f.close()
@@ -276,11 +282,12 @@ def main():
     transcribed_data = correlate_speakers(transcription_response)
 
     # 5. Format into easy to follow text
-    transcription_complete = output_transcription(transcribed_data)
+    transcription_complete = output_transcription(transcribed_data, job_name)
 
     # 6. Give the user the option to remove files to reserve space
     if transcription_complete:
         reserve_space(job_name, file_name, s3_bucket_name)
+
 
 
 
