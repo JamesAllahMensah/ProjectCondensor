@@ -1,4 +1,6 @@
 import hashlib
+import re
+import string
 import time
 import urllib
 
@@ -10,6 +12,7 @@ import glob, os
 import pathlib
 import math
 import time
+import enchant
 
 
 # Author: James (Jimmy) Allah-Mensah
@@ -233,16 +236,79 @@ def correlate_speakers(transcription_response):
             print(i[1] + "\n")
         return full_transcription
 
+# Attempts to identify the speaker's names
+def identify_speakers(full_transcription):
+    print('Attempting to identifying speakers names...')
+    # Six most common ways in which people introduce themselves
+    intro_category = {
+        'explicit_non_contraction': "my name is",
+        'explicit_contraction': "my name's",
+        'implicit_non_contraction': "I am",
+        'implicit_contraction': "I'm",
+        'informal_intro': "call me",
+        'alternative_name': "I go by",
+    }
+
+    # Introduction methods where the chance of the speakers name appearing directly after the phrase is high
+    # Ex: 'My name is [James]', 'I go by [James]'
+    explicit_list = ['explicit_non_contraction', 'explicit_contraction', 'informal_into', 'alternative_name']
+
+    # Any word said after the nth word no longer counts as a name
+    # Speaker is expected to introduce themselves early on
+    max_word_index = 50
+
+    full_speaker_script = {}
+    for script in full_transcription:
+        speaker = script[0].replace(":", "")
+        transcript = script[1]
+        if not speaker in full_speaker_script:
+            full_speaker_script[speaker] = re.sub(r'[^\w\s]','',transcript)
+        else:
+            full_speaker_script[speaker] += re.sub(r'[^\w\s]','',transcript)
+
+    identified_speakers = {}
+    for speaker_script in full_speaker_script:
+        regex_script = full_speaker_script[speaker_script].lower()
+        for category in intro_category:
+            search_phrase = re.sub(r'[^\w\s]','',intro_category[category]).lower()
+            num_matches = len(re.findall('{}'.format(search_phrase), regex_script))
+            if category in explicit_list:
+                if num_matches > 0:
+                    match = re.search('(?<={} )(.*)'.format(search_phrase), regex_script)
+                    if match is not None:
+                        name = match.groups()[0].split(' ')[0].capitalize()
+                        identified_speakers[speaker_script] = name
+                        break
+            else:
+                if num_matches > 0:
+                    name_list = []
+                    for i in range(num_matches):
+                        match = re.search('(?<={} )(.*)'.format(search_phrase), regex_script)
+                        word_index = regex_script.split(' ').index(match.groups()[0].split(' ')[0])
+                        name = match.groups()[0].split(' ')[0].capitalize()
+                        if name.isalpha() and word_index <= max_word_index:
+                            identified_speakers[speaker_script] = name
+                            break
+                        else:
+                            regex_script = regex_script.replace('{}'.format(search_phrase), '', 1)
+
+        if not speaker_script in identified_speakers:
+            identified_speakers[speaker_script] = speaker_script
+
+
+    return identified_speakers
 
 # Writes the formatted transcription to a text file
-def output_transcription(transcribed_data, job_name):
+def output_transcription(transcribed_data, job_name, speaker_dict):
     if transcribed_data is None:
         return False
 
     print('Printing the output to a text file...')
     f = open("{}.txt".format(job_name), "w")
     for i in transcribed_data:
-        f.write(i[0].replace(":", " [") + i[2] + "]:" + "\n")
+        speaker = i[0]
+        speaker_num = speaker_dict[speaker.replace(":", "")]
+        f.write(speaker_num + " [" + i[2] + "]: " + "\n")
         f.write(i[1] + "\n")
         f.write("\n")
     f.close()
@@ -281,14 +347,15 @@ def main():
     # 3. Parse the JSON Response
     transcribed_data = correlate_speakers(transcription_response)
 
+    # 4. Attempt to identify speaker names
+    speaker_names = identify_speakers(transcribed_data)
+
     # 5. Format into easy to follow text
-    transcription_complete = output_transcription(transcribed_data, job_name)
+    transcription_complete = output_transcription(transcribed_data, job_name, speaker_names)
 
     # 6. Give the user the option to remove files to reserve space
     if transcription_complete:
         reserve_space(job_name, file_name, s3_bucket_name)
-
-
 
 
 if __name__ == '__main__':
