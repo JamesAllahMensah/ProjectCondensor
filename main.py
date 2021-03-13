@@ -365,8 +365,12 @@ def get_time_from_word(transcription_response, speakers):
                     if len(word) == len(initial_word):
                         char_compare = diff_letters(word, initial_word)
                         if segment_index + len(word_list) <= len(
-                                segments) and segment_index not in suggestion_index:  # and not in segment_index
-                            if char_compare == 0 or char_compare == 1 or char_compare == 2 or char_compare == 3:
+                                segments) and segment_index not in suggestion_index:
+                            adequate_compare = False
+                            for comp_index in range(num_suggestions + 1):
+                                if char_compare == comp_index:
+                                    adequate_compare = True
+                            if adequate_compare:
                                 match_start = 1
                                 total_compare_cnt = char_compare
                                 full_suggestion = word
@@ -382,7 +386,7 @@ def get_time_from_word(transcription_response, speakers):
 
                                         total_compare_cnt += compare_cnt
                                         if compare_word != segments[segment_index + match_start]['alternatives'][0][
-                                            'content'].lower() and compare_cnt > 3:
+                                            'content'].lower() and compare_cnt > num_suggestions:
                                             suggestion_index.append(segment_index)  # suggestion_index.append
                                             segment_index = 0
                                             break
