@@ -622,6 +622,7 @@ def output_transcription(transcribed_data, job_name, speaker_dict):
     pdf.output('{}.pdf'.format(job_name.replace("_", " ")).title())
     return True
 
+# Identifies when the user said a specific word or phrase, output to a pdf file.
 def recordTimes(speakers, job_name):
     search_text = input('Transcription complete! Would you like to search the transcribed text for specific words or '
                         'phrases (Y/N):')
@@ -655,49 +656,35 @@ def recordTimes(speakers, job_name):
                         word_cnt += 1
 
                 word_frequency[rec_time] = word_cnt
-            f = open("{}.txt".format(job_name), "w")
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", size=20)
             pdf.cell(200, 10, txt=job_name.replace("_", " ").title() + " Search Index", ln=1, align='C')
-            output_begun = False
             line_cnt = 5
             for word_or_phrase in recorded_times:
                 time_frequency = word_frequency[word_or_phrase]
-
-                if output_begun:
-                    f.write('\n')
-
-                output_begun = True
                 pdf.set_font("Arial", 'B', size=16)
                 pdf.cell(200, 10, txt='', ln=line_cnt, align='L')
                 line_cnt += 1
                 pdf.cell(200, 10, txt="\'{}\' ".format(word_or_phrase.capitalize()), ln=line_cnt, align='L')
                 line_cnt += 1
-                f.write("\'{}\' ".format(word_or_phrase.capitalize()))
                 pdf.set_font("Arial", '', size=14)
                 if time_frequency == 1:
-                    f.write("mentioned {} time \n".format(time_frequency))
                     pdf.cell(200, 10, txt="mentioned {} time \n".format(time_frequency), ln=line_cnt, align='L')
                 else:
-                    f.write("mentioned {} times \n".format(time_frequency))
                     pdf.cell(200, 10, txt="mentioned {} times \n".format(time_frequency), ln=line_cnt, align='L')
 
                 for speaker in speaker_list:
                     if speaker in list(recorded_times[word_or_phrase].keys()):
-                        f.write('\n')
                         pdf.cell(200, 10, txt='', ln=line_cnt, align='L')
                         line_cnt += 1
-                        f.write('{} \n'.format(speaker))
                         pdf.cell(200, 10, txt='{} \n'.format(speaker), ln=line_cnt, align='L')
                         line_cnt += 1
                         time_stamps = recorded_times[word_or_phrase][speaker]
                         for time_stamp in time_stamps:
-                            f.write('{} \n'.format(time_stamp))
                             pdf.cell(200, 10, txt='{} \n'.format(time_stamp), ln=line_cnt, align='L')
                             line_cnt += 1
                     line_cnt += 2
-            f.close()
             pdf.output('{}.pdf'.format(job_name.replace("_", " ")).title())
             return True
     return False
@@ -743,7 +730,7 @@ def main():
     if transcription_complete:
         reserve_space(job_name, file_name, s3_bucket_name)
 
-    # 7. Identify when the user said a specific word or phrase, output to a text file.
+    # 7. Identify when the user said a specific word or phrase, output to a pdf file.
     time_retrievals = recordTimes(speaker_names, job_name)
 
 
