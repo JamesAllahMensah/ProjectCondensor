@@ -13,6 +13,9 @@ import pathlib
 import math
 import time
 import enchant
+from fpdf import FPDF
+from datetime import datetime
+from pytz import timezone
 
 
 # Author: James (Jimmy) Allah-Mensah
@@ -402,6 +405,10 @@ def get_time_from_word(transcription_response, speakers):
                     segment_index += 1
 
                 if len(detected_times) > 0:
+                    print('The phrase: \'{}\' was mentioned {} times during the following time(s):'.format(detection,
+                                                                                                           len(
+
+                                                                                                               detected_times)))
                     speaker_segment = data['results']['speaker_labels']['segments']
                     for spk_segment in speaker_segment:
                         spk_items = spk_segment['items']
@@ -441,8 +448,8 @@ def get_time_from_word(transcription_response, speakers):
                         for indiv_word in word_list:
                             if suggest == indiv_word:
                                 exact_match += 1
-                    exact_match = exact_match * -1
-                    suggestions[suggest] = exact_match
+                                exact_match = exact_match * -1
+                                suggestions[suggest] = exact_match
 
                     suggestions = list(dict(sorted(suggestions.items(), key=lambda item: item[1])))
 
@@ -459,7 +466,7 @@ def get_time_from_word(transcription_response, speakers):
                         if try_again == 'q':
                             return
                         elif try_again.isnumeric():
-                            detection = suggestions[int(try_again)]
+                            detection = suggestions[int(try_again) - 1]
                         else:
                             detection = try_again
                     else:
@@ -468,7 +475,6 @@ def get_time_from_word(transcription_response, speakers):
                         if detection == 'q':
                             return
     else:
-        searched_word = detection
         while not found:
             if transcription_response is not None:
                 response = urllib.request.urlopen(transcription_response)
@@ -477,15 +483,15 @@ def get_time_from_word(transcription_response, speakers):
                 suggestion_list = {}
                 for segment in segments:
                     word = segment['alternatives'][0]['content'].lower()
-                    if word == searched_word:  # If we did find the word, retrieve the time
+                    if word == detection:  # If we did find the word, retrieve the time
                         start_time = str(time.strftime('%H:%M:%S', time.gmtime(round(float(segment['start_time'])))))
                         raw_start_time = segment['start_time']
-                        detected_times.append((word, start_time, raw_start_time))
+                        detected_times.append((detection, start_time, raw_start_time))
                         found = True
 
                     else:  # If we did not find the word, find a similar word and add it as a suggestion
-                        if len(word) == len(searched_word):
-                            char_compare = diff_letters(word, searched_word)
+                        if len(word) == len(detection):
+                            char_compare = diff_letters(word, detection)
                             if char_compare == 1 or char_compare == 2 or char_compare == 3:
                                 if word not in suggestion_list:
                                     suggestion_list[word.capitalize()] = char_compare
@@ -507,7 +513,7 @@ def get_time_from_word(transcription_response, speakers):
                             if searched_index.lower() == 'q':
                                 return
                             else:
-                                searched_word = input('Please enter a word: ').lower()
+                                detection = input('Please enter a word: ').lower()
                                 continue
                         else:
                             searched_index = int(searched_index)
@@ -525,15 +531,15 @@ def get_time_from_word(transcription_response, speakers):
                             else:
                                 searched_index = int(searched_index)
 
-                        searched_word = suggestion_list[searched_index - 1].lower()
+                        detection = suggestion_list[searched_index - 1].lower()
                     else:
                         print('Could not identify the word within the transcribe text, no suggestions available.')
-                        searched_word = input('Please enter another word or enter Q to quit: ').lower()
+                        detection = input('Please enter another word or enter Q to quit: ').lower()
 
-                        if searched_word == 'q':
+                        if detection == 'q':
                             return
                 else:
-                    print('The word: \'{}\' was mentioned {} times during the following time(s):'.format(searched_word,
+                    print('The word: \'{}\' was mentioned {} times during the following time(s):'.format(detection,
                                                                                                          len(
 
                                                                                                              detected_times)))
@@ -565,23 +571,136 @@ def get_time_from_word(transcription_response, speakers):
                     return return_dict
 
 
-# Writes the formatted transcription to a text file
+# Writes the formatted transcription to a PDF file
 def output_transcription(transcribed_data, job_name, speaker_dict):
     if transcribed_data is None:
         return False
 
-    print('Printing the output to a text file...')
-    f = open("{}.txt".format(job_name), "w")
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=20)
+    pdf.cell(200, 10, txt=job_name.replace("_", " ").title(), ln=1, align='C')
+
+    tz = timezone('EST')
+    date = str(datetime.now(tz).strftime('%m/%d/%y %I:%M %p'))
+    pdf.set_font("Arial", size=15)
+    pdf.cell(200, 10, txt=date, ln=2, align='C')
+
+    print('Printing the output to a PDF file...')
+    pdf.set_font("Helvetica", size=12)
+    line_cnt = 5
+    max_length = 90
+
     for i in transcribed_data:
         speaker = i[0]
         speaker_num = speaker_dict[speaker.replace(":", "")]
-        f.write(speaker_num + " [" + i[2] + "]: " + "\n")
-        f.write(i[1] + "\n")
-        f.write("\n")
-    f.close()
-    print('Transcription Complete!')
+        pdf.set_font("Helvetica", 'B', size=12)
+        pdf.cell(200, 10, txt=speaker_num + " [" + i[2] + "]:", ln=line_cnt, align='L')
+        pdf.set_font("Helvetica", size=12)
+        line_cnt += 1
+        output_text_line_1 = i[1]
+        if len(output_text_line_1) > max_length:
+            split_index = max_length
+            while len(output_text_line_1) > max_length:
+                if output_text_line_1[max_length].isalnum():
+                    while output_text_line_1[split_index].isalnum():
+                        split_index -= 1
+                split_text = output_text_line_1[0: split_index]
+                output_text_line_1 = output_text_line_1[split_index:len(output_text_line_1)]
+                pdf.cell(200, 10, txt=split_text.lstrip(), ln=line_cnt, align='L')
+                line_cnt += 1
+            pdf.cell(200, 10, txt=output_text_line_1.lstrip(), ln=line_cnt, align='L')
+            line_cnt += 2
+        else:
+            pdf.cell(200, 10, txt=output_text_line_1, ln=line_cnt, align='L')
+            line_cnt += 2
+
+        pdf.cell(200, 10, txt='', ln=line_cnt, align='L')
+
+    pdf.set_font("Helvetica", size=10)
+    pdf.cell(200, 10, txt='Transcription made possible using AWS Transcribe.', ln=line_cnt + 1, align='L')
+    pdf.output('{}.pdf'.format(job_name.replace("_", " ")).title())
     return True
 
+def recordTimes(speakers, job_name):
+    search_text = input('Transcription complete! Would you like to search the transcribed text for specific words or '
+                        'phrases (Y/N):')
+
+    recorded_times = {}
+    job_name = job_name.replace('_', ' ').capitalize()
+    if search_text.lower()[0] == 'y':
+        continue_search = True
+        while continue_search:
+            detected_times = get_time_from_word(speakers)
+            if detected_times is not None:
+                recorded_times[list(detected_times.keys())[0]] = detected_times[list(detected_times.keys())[0]]
+            another_search = input('Would you like to search for another word or phrase?')
+            if another_search.lower()[0] != 'y':
+                continue_search = False
+        record = input('Would you like to record these times (Y/N):')
+        if record.lower()[0] == 'y':
+            time_segments = list(recorded_times.values())
+            speaker_list = []
+            for time in time_segments:
+                speakers = time
+                for speaker in list(speakers.keys()):
+                    if speaker not in speaker_list:
+                        speaker_list.append(speaker)
+            word_cnt = 0
+            word_frequency = {}
+            for rec_time in recorded_times:
+                word_cnt = 0
+                for rec_speakers in recorded_times[rec_time]:
+                    for rec_time_seg in recorded_times[rec_time][rec_speakers]:
+                        word_cnt += 1
+
+                word_frequency[rec_time] = word_cnt
+            f = open("{}.txt".format(job_name), "w")
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", size=20)
+            pdf.cell(200, 10, txt=job_name.replace("_", " ").title() + " Search Index", ln=1, align='C')
+            output_begun = False
+            line_cnt = 5
+            for word_or_phrase in recorded_times:
+                time_frequency = word_frequency[word_or_phrase]
+
+                if output_begun:
+                    f.write('\n')
+
+                output_begun = True
+                pdf.set_font("Arial", 'B', size=16)
+                pdf.cell(200, 10, txt='', ln=line_cnt, align='L')
+                line_cnt += 1
+                pdf.cell(200, 10, txt="\'{}\' ".format(word_or_phrase.capitalize()), ln=line_cnt, align='L')
+                line_cnt += 1
+                f.write("\'{}\' ".format(word_or_phrase.capitalize()))
+                pdf.set_font("Arial", '', size=14)
+                if time_frequency == 1:
+                    f.write("mentioned {} time \n".format(time_frequency))
+                    pdf.cell(200, 10, txt="mentioned {} time \n".format(time_frequency), ln=line_cnt, align='L')
+                else:
+                    f.write("mentioned {} times \n".format(time_frequency))
+                    pdf.cell(200, 10, txt="mentioned {} times \n".format(time_frequency), ln=line_cnt, align='L')
+
+                for speaker in speaker_list:
+                    if speaker in list(recorded_times[word_or_phrase].keys()):
+                        f.write('\n')
+                        pdf.cell(200, 10, txt='', ln=line_cnt, align='L')
+                        line_cnt += 1
+                        f.write('{} \n'.format(speaker))
+                        pdf.cell(200, 10, txt='{} \n'.format(speaker), ln=line_cnt, align='L')
+                        line_cnt += 1
+                        time_stamps = recorded_times[word_or_phrase][speaker]
+                        for time_stamp in time_stamps:
+                            f.write('{} \n'.format(time_stamp))
+                            pdf.cell(200, 10, txt='{} \n'.format(time_stamp), ln=line_cnt, align='L')
+                            line_cnt += 1
+                    line_cnt += 2
+            f.close()
+            pdf.output('{}.pdf'.format(job_name.replace("_", " ")).title())
+            return True
+    return False
 
 # Deletes the audio file from the S3 bucket & the transcription job
 def reserve_space(job_name, object_key, bucket):
@@ -617,15 +736,15 @@ def main():
     # 4. Attempt to identify speaker names
     speaker_names = identify_speakers(transcribed_data)
 
-    # 5. Format into easy to follow text
+    # 5. Writes transcribed text to a PDF file
     transcription_complete = output_transcription(transcribed_data, job_name, speaker_names)
 
     # 6. Give the user the option to remove files to reserve space
     if transcription_complete:
         reserve_space(job_name, file_name, s3_bucket_name)
 
-    # 7. Identify when the user said a specific word or phrase (If none found, suggestions are made)
-    time_retrievals = get_time_from_word(transcription_response, speaker_names)
+    # 7. Identify when the user said a specific word or phrase, output to a text file.
+    time_retrievals = recordTimes(speaker_names, job_name)
 
 
 if __name__ == '__main__':
