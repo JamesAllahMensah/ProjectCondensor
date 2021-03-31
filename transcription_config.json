@@ -12,7 +12,7 @@
   ],
   "MaxNumberSuggestions": 3,
   "NameIntroductionWordBound": 50,
-  "language_options": {
+  "LanguageOptions": {
     "Afrikaans": {
       "South Africa": "af-ZA"
     },
@@ -97,6 +97,7 @@
     }
   },
   "IncludedLanguages": ["en-US"],
+  "DefaultLanguage": "en-US",
   "MediaFormats": ["mp3", "mp4", "wav", "flac", "ogg", "amr", "webm"],
   "IntroductionCategories": {
         "explicit_non_contraction": "my name is",
@@ -104,7 +105,7 @@
         "implicit_non_contraction": "I am",
         "implicit_contraction": "I'm",
         "informal_intro": "call me",
-        "alternative_name": "I go by",
+        "alternative_name": "I go by"
     },
   "ExplicitIntroductionList": ["explicit_non_contraction", "explicit_contraction", "informal_into", "alternative_name"],
   "MediaFormat": "mp4",

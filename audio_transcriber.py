@@ -22,6 +22,27 @@ from pytz import timezone
 # Date: 2/25/21
 # Version: Python 3.7
 
+# Loads configuration setting given a key
+'''
+WatchWords (Array): Words whose times are automatically recorded and outputted to the search index PDF
+MaxNumberSuggestions (Integer): The maximum number of suggestions that are to be displayed if the entered word or phrase does not exist
+NameIntroductionWordBound (Integer): When identify speakers, any implicit or explicit phrase identified after nth word is disregarded
+LanguageOptions (Dictionary): All language options that AWS Transcribe can handle, includes the Language as well as the associated Countries
+IncludedLanguages (Array): Current language(s) identified in the transcription. Must have a minimum of two values to be counted
+DefaultLanguage (String): The default transcription language assuming IncludedLanguages has less than the minimum required values (2).
+MediaFormats (Array): All possible media formats that AWS Transcribe can handle
+MediaFormat (String): Current desired media format
+IntroductionCategories (Dictionary): The methods (phrases) in which a person introduces themselves
+ExplicitIntroductionList (Array): The methods (phrases) where the chance of the person's name appearing after is high
+MaxSpeakerLabels (Integer): The maximum number of speakers that can be identified. Max is 10.
+EditConfigOnStart (Boolean): Asks the user if they would like to view/edit configurations at the start of the program
+'''
+def getConfiguration(key):
+    with open('transcription_config.json') as file:
+        data = json.load(file)
+    return data[key]
+
+
 # Calculates the s3 etag (hash) of the audio file and compares to that of those already in the S3 bucket
 def calculate_s3_etag(file_path, chunk_size=8 * 1024 * 1024):
     md5s = []
@@ -44,26 +65,27 @@ def calculate_s3_etag(file_path, chunk_size=8 * 1024 * 1024):
     return '"{}-{}"'.format(digests_md5.hexdigest(), len(md5s))
 
 
-# Searches for a .mp4 within the script directory
+# Searches for a file matching the desired media format within the script directory
 def retrieve_audio():
     print('Retrieving Audio File(s)...')
     output_file = ''
+    media_format = getConfiguration('MediaFormat')
     audio_files = []
     file_path = pathlib.Path(__file__).parent.absolute()
     os.chdir(file_path)
-    for file in glob.glob("*.mp4"):
+    for file in glob.glob("*.{}".format(media_format)):
         audio_files.append(file)
 
     if len(audio_files) == 0:
-        print('No .mp4 files were found. Please ensure that they are located in {}'.format(file_path))
+        print('No .{0} files were found. Please ensure that they are located in {1}'.format(media_format, file_path))
         return None
 
     elif len(audio_files) == 1:
         return audio_files[0]
     else:
         correct_file = input(
-            '{} .mp4 files were found. Please enter the name of the desired audio file: (Enter L to list all .mp4 files):'.format(
-                len(audio_files)))
+            '{0} .{1} files were found. Please enter the name of the desired audio file: (Enter L to list all .{1} files):'.format(
+                len(audio_files), media_format))
         if correct_file.lower()[0] == 'l':
             for idx, val in enumerate(audio_files):
                 print('{}: {}'.format(idx + 1, val))
@@ -80,7 +102,7 @@ def retrieve_audio():
             else:
                 while selected_file.lower() not in map(lambda x: x.lower(),
                                                        audio_files) and selected_file.lower() not in map(
-                    lambda x: x.lower().replace(".mp4", ""), audio_files):
+                    lambda x: x.lower().replace(".{}".format(media_format), ""), audio_files):
                     selected_file = input(
                         'Could not find that file. Please re-enter the file index (ex: 1) or the file name of the desired file (ex: {}):'.format(
                             audio_files[0]))
@@ -88,7 +110,7 @@ def retrieve_audio():
                 output_file = selected_file
         else:
             while correct_file.lower() not in map(lambda x: x.lower(), audio_files) and correct_file.lower() not in map(
-                    lambda x: x.lower().replace(".mp4", ""), audio_files):
+                    lambda x: x.lower().replace(".{}".format(media_format), ""), audio_files):
                 correct_file = input(
                     'Could not find that file. Please re-enter the file index (ex: 1) or the file name of the desired file (ex: {}):'.format(
                         audio_files[0]))
@@ -97,8 +119,8 @@ def retrieve_audio():
 
         if output_file not in audio_files:
             for audio_file in audio_files:
-                if '.mp4' not in output_file:
-                    if (output_file.lower() + '.mp4') == audio_file.lower():
+                if '.{}'.format(media_format) not in output_file:
+                    if (output_file.lower() + '.{}'.format(media_format)) == audio_file.lower():
                         return audio_file
                 else:
                     if output_file.lower() == audio_file.lower():
@@ -183,11 +205,11 @@ def transcribe_file(file_uri, transcribe_client, job_name):
     transcribe_client.start_transcription_job(
         TranscriptionJobName=job_name,
         Media={'MediaFileUri': file_uri},
-        MediaFormat='mp4',
+        MediaFormat=getConfiguration('MediaFormat'),
         LanguageCode='en-US',
         Settings={
             'ShowSpeakerLabels': True,
-            'MaxSpeakerLabels': 10
+            'MaxSpeakerLabels': getConfiguration('MaxSpeakerLabels')
         }
     )
 
@@ -251,18 +273,11 @@ def correlate_speakers(transcription_response):
 def identify_speakers(full_transcription):
     print('Attempting to identifying speakers names...')
     # Six most common ways in which people introduce themselves
-    intro_category = {
-        'explicit_non_contraction': "my name is",
-        'explicit_contraction': "my name's",
-        'implicit_non_contraction': "I am",
-        'implicit_contraction': "I'm",
-        'informal_intro': "call me",
-        'alternative_name': "I go by",
-    }
+    intro_category = getConfiguration("IntroductionCategories")
 
     # Introduction methods where the chance of the speakers name appearing directly after the phrase is high
     # Ex: 'My name is [James]', 'I go by [James]'
-    explicit_list = ['explicit_non_contraction', 'explicit_contraction', 'informal_into', 'alternative_name']
+    explicit_list = getConfiguration("ExplicitIntroductionList")
 
     # Any word said after the nth word no longer counts as a name
     # Speaker is expected to introduce themselves early on
@@ -317,7 +332,7 @@ def diff_letters(a, b):
 
 
 # 7. Identify when the user said a specific word or phrase (If none found, suggestions are made)
-def get_time_from_word(transcription_response, speakers):
+def get_time_from_word(transcription_response, speakers, is_watch_word, watch_word):
     formatted_speakers = {}
     for speaker in speakers:
         format_speaker = speaker.replace("Speaker", "spk").replace(" ", "_")
@@ -325,10 +340,12 @@ def get_time_from_word(transcription_response, speakers):
 
     speakers = formatted_speakers
     detection = input('Please enter a word or phrase: ').lower()
+    if is_watch_word:
+        detection = watch_word.lower()
 
     speaker_dict = {}
     detected_times = []
-    num_suggestions = 3
+    num_suggestions = getConfiguration("MaxNumberSuggestions")
     found = False
 
     if ' ' in detection:
@@ -445,6 +462,9 @@ def get_time_from_word(transcription_response, speakers):
                     return return_dict
 
                 else:
+                    if is_watch_word:
+                        return None
+
                     exact_match = 0
                     for suggest in suggestions:
                         for indiv_word in word_list:
@@ -499,6 +519,8 @@ def get_time_from_word(transcription_response, speakers):
                                     suggestion_list[word.capitalize()] = char_compare
 
                 if not found:
+                    if is_watch_word:
+                        return None
                     suggestion_list = list(dict(sorted(suggestion_list.items(), key=lambda item: item[1])))
 
                     if len(suggestion_list) > 0:
@@ -635,12 +657,19 @@ def recordTimes(speakers, job_name, transcription_response):
     if search_text.lower()[0] == 'y':
         continue_search = True
         while continue_search:
-            detected_times = get_time_from_word(transcription_response, speakers)
+            detected_times = get_time_from_word(transcription_response, speakers, False, None)
             if detected_times is not None:
                 recorded_times[list(detected_times.keys())[0]] = detected_times[list(detected_times.keys())[0]]
             another_search = input('Would you like to search for another word or phrase?')
             if another_search.lower()[0] != 'y':
                 continue_search = False
+            # Iterate through watch words, pass in true as blocklist , if not none add to recorded_times
+        print('Searching for Watch Words...')
+        watch_words = getConfiguration("WatchWords")
+        for watch_word in watch_words:
+            watch_word_detection = get_time_from_word(transcription_response, speakers, True, watch_word)
+            if watch_word_detection is not None:
+                recorded_times[list(watch_word_detection.keys())[0]] = watch_word_detection[list(watch_word_detection.keys())[0]]
         record = input('Would you like to record these times (Y/N):')
         if record.lower()[0] == 'y':
             time_segments = list(recorded_times.values())
@@ -712,7 +741,7 @@ def transcribe_audio():
     # Loads AWS S3 bucket information, with preference option
     s3_bucket_name = get_s3_bucket(None)
 
-    # Searches for a .mp4 within the script directory
+    # Searches for a file matching the desired media format within the script directory
     file_name = retrieve_audio()
 
     # 1. Upload file to AWS S3 Bucket
