@@ -1,0 +1,113 @@
+{
+  "WatchWords": [
+    "Artificial Intelligence",
+    "Cloud",
+    "Cyber",
+    "Data and Analytics",
+    "Digital Modernization",
+    "Enterprise Business Solutions",
+    "High Performance Computing",
+    "Application Services",
+    "Managed Services"
+  ],
+  "MaxNumberSuggestions": 3,
+  "NameIntroductionWordBound": 50,
+  "language_options": {
+    "Afrikaans": {
+      "South Africa": "af-ZA"
+    },
+    "Arabic": {
+      "United Arab Emirates": "ar-AE",
+      "Saudi Arabia": "ar-SA"
+    },
+    "Welsh": {
+      "United Kingdom": "cy-GB"
+    },
+    "Danish": {
+      "Denmark": "da-DK"
+    },
+    "German": {
+      "Switzerland": "de-CH",
+      "Germany": "de-DE"
+    },
+    "English": {
+      "Austrailia": "en-AU",
+      "United Kingdom": "en-GB",
+      "Ireland": "en-AU",
+      "India": "en-IN",
+      "United States": "en-US",
+      "World": "en-WL"
+    },
+    "Spanish": {
+      "Spain": "es-ES",
+      "United States": "en-US"
+    },
+    "Farsi": {
+      "Iran": "fa-IR"
+    },
+    "French": {
+      "Canada": "fr-CA",
+      "Framce": "fr-FR"
+    },
+    "Irish": {
+      "Ireland": "ga-IE"
+    },
+    "Scottish Gaelic": {
+      "United Kingdom": "gd-GB"
+    },
+    "Hebrew": {
+      "Isreal": "he-IL"
+    },
+    "Hindi": {
+      "India": "hi-IN"
+    },
+    "Italian": {
+      "Italy": "it-IT"
+    },
+    "Japanese": {
+      "Japan": "ja-JP"
+    },
+    "Korean": {
+      "Korea": "ko-KR"
+    },
+    "Malay": {
+      "Malaysia": "ms-MY"
+    },
+    "Dutch": {
+      "Netherlands": "nl-NL"
+    },
+    "Portuguese": {
+      "Brazil": "pt-BR",
+      "Portugal": "pt-PT"
+    },
+    "Russian": {
+      "Russia": "ru-RU"
+    },
+    "Tamil": {
+      "India": "ta-IN"
+    },
+    "Telegu": {
+      "India": "te-IN"
+    },
+    "Turkish": {
+      "Turkey": "tr-TR"
+    },
+    "Chinese": {
+      "China": "zh-CN"
+    }
+  },
+  "IncludedLanguages": ["en-US"],
+  "MediaFormats": ["mp3", "mp4", "wav", "flac", "ogg", "amr", "webm"],
+  "IntroductionCategories": {
+        "explicit_non_contraction": "my name is",
+        "explicit_contraction": "my name's",
+        "implicit_non_contraction": "I am",
+        "implicit_contraction": "I'm",
+        "informal_intro": "call me",
+        "alternative_name": "I go by",
+    },
+  "ExplicitIntroductionList": ["explicit_non_contraction", "explicit_contraction", "informal_into", "alternative_name"],
+  "MediaFormat": "mp4",
+  "MaxSpeakerLabels": 10,
+  "EditConfigOnStart": false
+}
