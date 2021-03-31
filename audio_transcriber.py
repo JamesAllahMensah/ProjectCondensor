@@ -295,7 +295,7 @@ def identify_speakers(full_transcription):
 
     # Any word said after the nth word no longer counts as a name
     # Speaker is expected to introduce themselves early on
-    max_word_index = 50
+    max_word_index = getConfiguration("NameIntroductionWordBound")
 
     full_speaker_script = {}
     for script in full_transcription:
