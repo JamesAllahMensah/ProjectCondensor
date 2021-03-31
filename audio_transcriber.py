@@ -17,7 +17,6 @@ from fpdf import FPDF
 from datetime import datetime
 from pytz import timezone
 
-
 # Author: James (Jimmy) Allah-Mensah
 # Date: 2/25/21
 # Version: Python 3.7
@@ -37,6 +36,8 @@ ExplicitIntroductionList (Array): The methods (phrases) where the chance of the 
 MaxSpeakerLabels (Integer): The maximum number of speakers that can be identified. Max is 10.
 EditConfigOnStart (Boolean): Asks the user if they would like to view/edit configurations at the start of the program
 '''
+
+
 def getConfiguration(key):
     with open('transcription_config.json') as file:
         data = json.load(file)
@@ -202,16 +203,29 @@ def transcribe_file(file_uri, transcribe_client, job_name):
         else:
             return None
 
-    transcribe_client.start_transcription_job(
-        TranscriptionJobName=job_name,
-        Media={'MediaFileUri': file_uri},
-        MediaFormat=getConfiguration('MediaFormat'),
-        LanguageCode='en-US',
-        Settings={
-            'ShowSpeakerLabels': True,
-            'MaxSpeakerLabels': getConfiguration('MaxSpeakerLabels')
-        }
-    )
+    language_options = getConfiguration("IncludedLanguages")
+    if len(language_options) < 2:
+        transcribe_client.start_transcription_job(
+            TranscriptionJobName=job_name,
+            Media={'MediaFileUri': file_uri},
+            MediaFormat=getConfiguration('MediaFormat'),
+            LanguageCode=getConfiguration("DefaultLanguage"),
+            Settings={
+                'ShowSpeakerLabels': True,
+                'MaxSpeakerLabels': getConfiguration('MaxSpeakerLabels')
+            }
+        )
+    else:
+        transcribe_client.start_transcription_job(
+            TranscriptionJobName=job_name,
+            Media={'MediaFileUri': file_uri},
+            MediaFormat=getConfiguration('MediaFormat'),
+            LanguageOptions=getConfiguration("IncludedLanguages"),
+            Settings={
+                'ShowSpeakerLabels': True,
+                'MaxSpeakerLabels': getConfiguration('MaxSpeakerLabels')
+            }
+        )
 
     max_tries = 60
     while max_tries > 0:
@@ -669,7 +683,8 @@ def recordTimes(speakers, job_name, transcription_response):
         for watch_word in watch_words:
             watch_word_detection = get_time_from_word(transcription_response, speakers, True, watch_word)
             if watch_word_detection is not None:
-                recorded_times[list(watch_word_detection.keys())[0]] = watch_word_detection[list(watch_word_detection.keys())[0]]
+                recorded_times[list(watch_word_detection.keys())[0]] = watch_word_detection[
+                    list(watch_word_detection.keys())[0]]
         record = input('Would you like to record these times (Y/N):')
         if record.lower()[0] == 'y':
             time_segments = list(recorded_times.values())
