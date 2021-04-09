@@ -1,7 +1,5 @@
 import hashlib
 import re
-import string
-import time
 import urllib
 
 import boto3
@@ -10,9 +8,9 @@ import json
 import logging
 import glob, os
 import pathlib
-import math
+import googletrans
+from google_trans_new import google_translator
 import time
-import enchant
 from fpdf import FPDF
 from datetime import datetime
 from pytz import timezone
@@ -224,7 +222,8 @@ def transcribe_file(file_uri, transcribe_client, job_name):
             Settings={
                 'ShowSpeakerLabels': True,
                 'MaxSpeakerLabels': getConfiguration('MaxSpeakerLabels')
-            }
+            },
+            IdentifyLanguage=True
         )
 
     max_tries = 60
@@ -281,6 +280,69 @@ def correlate_speakers(transcription_response):
             print(i[0].replace(":", " [") + i[2] + "]:")
             print(i[1] + "\n")
         return full_transcription
+
+
+# Gives user an option to translate the text (supports over 40 languages)
+def translate_script(transcription_response, transcribed_data):
+    if transcribed_data is not None:
+        response = urllib.request.urlopen(transcription_response)
+        data = json.loads(response.read())
+        language_code = data['results']['language_code']
+
+        language_options = getConfiguration('LanguageOptions')
+        for dialects in list(language_options.values()):
+            for dialect in list(dialects.values()):
+                if dialect == language_code:
+                    detected_language = list(language_options.keys())[
+                        list(language_options.values()).index(dialects)]
+                    detected_dialect = list(dialects.keys())[list(dialects.values()).index(dialect)]
+                    break
+
+        print('The detected Language is: {}'.format(detected_language))
+        translate_text = input(('Would you like to translate the transcribed audio?'))
+        if translate_text[0].lower() == 'y':
+            destination_language = input(
+                'Please enter the destination lanuage or type in \'options\' for language options:').lower()
+            while (destination_language not in list(
+                    googletrans.LANGUAGES.values()) and destination_language not in list(
+                googletrans.LANGUAGES.keys()) or (str(detected_language).lower() == destination_language.lower())):
+                if 'option' in destination_language:
+                    print('Language: Language Abbreviation')
+                    for google_trans_option in googletrans.LANGUAGES:
+                        print('{}: {}'.format(googletrans.LANGUAGES[google_trans_option], google_trans_option))
+                if destination_language.lower() == str(detected_language).lower():
+                    print('Destination language cannot be the same as the source language.')
+                destination_language = input(
+                    'Please enter the destination lanuage or type in \'options\' for language options:')
+
+            if destination_language.lower() in list(googletrans.LANGUAGES.values()):
+                destination_language = list(googletrans.LANGUAGES.keys())[
+                    list(googletrans.LANGUAGES.values()).index(destination_language)]
+            source_language = list(googletrans.LANGUAGES.keys())[
+                list(googletrans.LANGUAGES.values()).index(str(detected_language).lower())]
+            print('Initiating translation...')
+            translated_transcribed_data = initiate_language_translation(transcribed_data, source_language, destination_language)
+            return translated_transcribed_data
+        else:
+            return transcribed_data
+    return None
+
+# Translates the text from the detected source language to the provided destination language
+def initiate_language_translation(transcribed_data, source_language, destination_language):
+    print('Translating text...')
+    translator = google_translator()
+    translated_transcribed_data = []
+
+    for index, value in enumerate(transcribed_data):
+        transcription_entry = transcribed_data[index]
+        translated_text = translator.translate(transcription_entry[1], lang_src=source_language,
+                                               lang_tgt=destination_language)
+        translation_package = (transcription_entry[0], translated_text, transcription_entry[2])
+        translated_transcribed_data.append(translation_package)
+
+    print('Translation from {} to {} complete!'.format(googletrans.LANGUAGES[source_language].capitalize(),
+                                                       googletrans.LANGUAGES[destination_language].capitalize()))
+    return translated_transcribed_data
 
 
 # Attempts to identify the speaker's names
@@ -770,16 +832,19 @@ def transcribe_audio():
     # 3. Parse the JSON Response
     transcribed_data = correlate_speakers(transcription_response)
 
-    # 4. Attempt to identify speaker names
+    # 4. Gives user an option to translate the text (supports over 40 languages)
+    translate_script(transcription_response, transcribed_data)
+
+    # 5. Attempt to identify speaker names
     speaker_names = identify_speakers(transcribed_data)
 
-    # 5. Writes transcribed text to a PDF file
+    # 6. Writes transcribed text to a PDF file
     transcription_complete = output_transcription(transcribed_data, job_name, speaker_names)
 
-    # 6. Identify when the user said a specific word or phrase, output to a pdf file.
+    # 7. Identify when the user said a specific word or phrase, output to a pdf file.
     time_retrievals = recordTimes(speaker_names, job_name, transcription_response)
 
-    # 7. Give the user the option to remove files to reserve space
+    # 8. Give the user the option to remove files to reserve space
     if transcription_complete:
         reserve_space(job_name, file_name, s3_bucket_name)
 
