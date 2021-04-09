@@ -833,7 +833,7 @@ def transcribe_audio():
     transcribed_data = correlate_speakers(transcription_response)
 
     # 4. Gives user an option to translate the text (supports over 40 languages)
-    translate_script(transcription_response, transcribed_data)
+    transcribed_data = translate_script(transcription_response, transcribed_data)
 
     # 5. Attempt to identify speaker names
     speaker_names = identify_speakers(transcribed_data)
