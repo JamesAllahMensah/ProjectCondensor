@@ -19,31 +19,38 @@ from pytz import timezone
 # Date: 2/25/21
 # Version: Python 3.7
 
-# Loads configuration setting given a key
-'''
-WatchWords (Array): Words whose times are automatically recorded and outputted to the search index PDF
-MaxNumberSuggestions (Integer): The maximum number of suggestions that are to be displayed if the entered word or phrase does not exist
-NameIntroductionWordBound (Integer): When identify speakers, any implicit or explicit phrase identified after nth word is disregarded
-LanguageOptions (Dictionary): All language options that AWS Transcribe can handle, includes the Language as well as the associated Countries
-IncludedLanguages (Array): Current language(s) identified in the transcription. Must have a minimum of two values to be counted
-DefaultLanguage (String): The default transcription language assuming IncludedLanguages has less than the minimum required values (2).
-MediaFormats (Array): All possible media formats that AWS Transcribe can handle
-MediaFormat (String): Current desired media format
-IntroductionCategories (Dictionary): The methods (phrases) in which a person introduces themselves
-ExplicitIntroductionList (Array): The methods (phrases) where the chance of the person's name appearing after is high
-MaxSpeakerLabels (Integer): The maximum number of speakers that can be identified. Max is 10.
-EditConfigOnStart (Boolean): Asks the user if they would like to view/edit configurations at the start of the program
-'''
 
 
 def getConfiguration(key):
+    '''
+    Loads configuration setting given a key
+
+    WatchWords (Array): Words whose times are automatically recorded and outputted to the search index PDF
+    MaxNumberSuggestions (Integer): The maximum number of suggestions that are to be displayed if the entered word or phrase does not exist
+    NameIntroductionWordBound (Integer): When identify speakers, any implicit or explicit phrase identified after nth word is disregarded
+    LanguageOptions (Dictionary): All language options that AWS Transcribe can handle, includes the Language as well as the associated Countries
+    IncludedLanguages (Array): Current language(s) identified in the transcription. Must have a minimum of two values to be counted
+    DefaultLanguage (String): The default transcription language assuming IncludedLanguages has less than the minimum required values (2).
+    MediaFormats (Array): All possible media formats that AWS Transcribe can handle
+    MediaFormat (String): Current desired media format
+    IntroductionCategories (Dictionary): The methods (phrases) in which a person introduces themselves
+    ExplicitIntroductionList (Array): The methods (phrases) where the chance of the person's name appearing after is high
+    MaxSpeakerLabels (Integer): The maximum number of speakers that can be identified. Max is 10.
+    EditConfigOnStart (Boolean): Asks the user if they would like to view/edit configurations at the start of the program
+
+    '''
     with open('transcription_config.json') as file:
         data = json.load(file)
     return data[key]
 
 
-# Calculates the s3 etag (hash) of the audio file and compares to that of those already in the S3 bucket
 def calculate_s3_etag(file_path, chunk_size=8 * 1024 * 1024):
+    '''
+    Calculates the s3 etag (hash) of the audio file and compares to that of those already in the S3 bucket
+    :param file_path: File Path
+    :param chunk_size: Size of File
+    :return: Hash of S3 file
+    '''
     md5s = []
 
     with open(file_path, 'rb') as fp:
@@ -64,8 +71,11 @@ def calculate_s3_etag(file_path, chunk_size=8 * 1024 * 1024):
     return '"{}-{}"'.format(digests_md5.hexdigest(), len(md5s))
 
 
-# Searches for a file matching the desired media format within the script directory
 def retrieve_audio():
+    '''
+    Searches for a file matching the desired media format within the script directory
+    :return: Audio file path
+    '''
     print('Retrieving Audio File(s)...')
     output_file = ''
     media_format = getConfiguration('MediaFormat')
@@ -126,8 +136,14 @@ def retrieve_audio():
                         return audio_file
 
 
-# Uploads the local file into the S3 bucket and returns the file URI
 def upload_file(file_name, bucket, object_name=None):
+    '''
+    Uploads the local file into the S3 bucket and returns the file URI
+    :param file_name: Name of file
+    :param bucket: Name of S3 Bucket
+    :param object_name: S3 Bucket Object
+    :return: upload file path
+    '''
     if object_name is None:
         object_name = file_name
 
@@ -156,8 +172,12 @@ def upload_file(file_name, bucket, object_name=None):
     return file_path
 
 
-# Returns the name of an available S3 Bucket
 def get_s3_bucket(preference):
+    '''
+    Returns the name of an available S3 Bucket
+    :param preference: Preferred S3 Bucket Name
+    :return: name of available S3 Bucket
+    '''
     print('Retrieving S3 Bucket Information...')
     s3 = boto3.client('s3')
     bucket_list = s3.list_buckets()['Buckets']
@@ -174,8 +194,12 @@ def get_s3_bucket(preference):
                     return bucket_list[0]['Name']
 
 
-# Checks if the job name already exists
 def is_job_name_unique(job_name):
+    '''
+    Checks if the job name already exists
+    :param job_name: Name of the transcription job
+    :return: False if the job name already exists, False if otherwise
+    '''
     s3_client = boto3.client('transcribe')
     transcription_jobs = s3_client.list_transcription_jobs()['TranscriptionJobSummaries']
     for job in transcription_jobs:
@@ -185,8 +209,14 @@ def is_job_name_unique(job_name):
     return True
 
 
-# Starts the transcription job and returns a json file when complete
 def transcribe_file(file_uri, transcribe_client, job_name):
+    '''
+    Starts the transcription job and returns a json file when complete
+    :param file_uri: Audio file path
+    :param transcribe_client: Boto3 AWS transcribe client
+    :param job_name: Name of transcription job
+    :return: The Transcription JSON
+    '''
     if file_uri is None:
         return file_uri
 
@@ -245,8 +275,12 @@ def transcribe_file(file_uri, transcribe_client, job_name):
     return None
 
 
-# Parses the JSON file into an easy to follow format, identify speakers
-def correlate_speakers(transcription_response):
+def format_transcription(transcription_response):
+    '''
+    Parses the JSON file into an easy to follow format, identify speakers
+    :param transcription_response: Transcription JSON
+    :return: The formatted transcriptions
+    '''
     if transcription_response is None:
         return None
 
@@ -282,8 +316,13 @@ def correlate_speakers(transcription_response):
         return full_transcription
 
 
-# Gives user an option to translate the text (supports over 40 languages)
 def translate_script(transcription_response, transcribed_data):
+    '''
+    Gives user an option to translate the text (supports over 40 languages)
+    :param transcription_response: Transcription JSON
+    :param transcribed_data: The translated transcription
+    :return:
+    '''
     if transcribed_data is not None:
         response = urllib.request.urlopen(transcription_response)
         data = json.loads(response.read())
@@ -327,8 +366,14 @@ def translate_script(transcription_response, transcribed_data):
             return transcribed_data
     return None
 
-# Translates the text from the detected source language to the provided destination language
 def initiate_language_translation(transcribed_data, source_language, destination_language):
+    '''
+    Translates the text from the detected source language to the provided destination language
+    :param transcribed_data: Transcribed text with each respective speaker
+    :param source_language: The language the transcription is currently in
+    :param destination_language: The langauge we would like the transcription to be in
+    :return:
+    '''
     print('Translating text...')
     translator = google_translator()
     translated_transcribed_data = []
@@ -345,8 +390,12 @@ def initiate_language_translation(transcribed_data, source_language, destination
     return translated_transcribed_data
 
 
-# Attempts to identify the speaker's names
 def identify_speakers(full_transcription):
+    '''
+    Attempts to identify the speaker's names by phrases set in the configuration file
+    :param full_transcription: Transcribed text with each respective speaker
+    :return: Transcribed text with each respective speaker's name, if detected
+    '''
     print('Attempting to identifying speakers names...')
     # Six most common ways in which people introduce themselves
     intro_category = getConfiguration("IntroductionCategories")
@@ -402,13 +451,22 @@ def identify_speakers(full_transcription):
     return identified_speakers
 
 
-# Helper method used to compare the different letters given two n-sized strings
 def diff_letters(a, b):
+    '''
+    Helper method used to compare the different letters given two n-sized strings
+    '''
     return sum(a[i] != b[i] for i in range(len(a)))
 
 
-# 7. Identify when the user said a specific word or phrase (If none found, suggestions are made)
 def get_time_from_word(transcription_response, speakers, is_watch_word, watch_word):
+    '''
+    Identifies when the user said a specific word or phrase (If none found, suggestions are made)
+    :param transcription_response: Transcribed text with each respective speaker
+    :param speakers: Identified or default speaker names
+    :param is_watch_word: Whether ot not the current word is a watch word
+    :param watch_word: The watch word, loaded from the configuration.json
+    :return: The timestamps of the word or phrase
+    '''
     formatted_speakers = {}
     for speaker in speakers:
         format_speaker = speaker.replace("Speaker", "spk").replace(" ", "_")
@@ -671,8 +729,14 @@ def get_time_from_word(transcription_response, speakers, is_watch_word, watch_wo
                     return return_dict
 
 
-# Writes the formatted transcription to a PDF file
 def output_transcription(transcribed_data, job_name, speaker_dict):
+    '''
+    Writes the formatted transcription to a PDF file
+    :param transcribed_data: Formatted transcription
+    :param job_name: Name of transcription job
+    :param speaker_dict: Identified or defaulted speaker
+    :return: True if the transcription could be outputted
+    '''
     if transcribed_data is None:
         return False
 
@@ -723,8 +787,14 @@ def output_transcription(transcribed_data, job_name, speaker_dict):
     return True
 
 
-# Identifies when the user said a specific word or phrase, output to a pdf file.
 def recordTimes(speakers, job_name, transcription_response):
+    '''
+    Identifies when the user said a specific word or phrase, output to a pdf file.
+    :param speakers: Identified or default speaker names
+    :param job_name: Name of transcription job
+    :param transcription_response: Formatted transcription
+    :return:
+    '''
     search_text = input('Transcription complete! Would you like to search the transcribed text for specific words or '
                         'phrases (Y/N):')
 
@@ -800,8 +870,14 @@ def recordTimes(speakers, job_name, transcription_response):
     return False
 
 
-# Deletes the audio file from the S3 bucket & the transcription job
 def reserve_space(job_name, object_key, bucket):
+    '''
+    Deletes the audio file from the S3 bucket & the transcription job
+    :param job_name: Name of transcription_job
+    :param object_key: Audio file path inside S3 bucket
+    :param bucket: Name of S3 Bucket
+    :return: True if successfully deleted or user decides to keep, False if otherwise
+    '''
     reserve = input('Would you like to delete the transcription job and audio file to reserve space (Y/N):')
     if reserve.lower()[0] == 'y':
         try:
@@ -810,51 +886,48 @@ def reserve_space(job_name, object_key, bucket):
             s3_client.delete_object(Bucket=bucket, Key=object_key)
             s3_transcribe_client.delete_transcription_job(TranscriptionJobName=job_name)
             print('Job {} & File {} have successfully been deleted.'.format(job_name, object_key))
+            return True
         except ClientError as e:
             logging.error(e)
+            return False
+    return True
 
 
 def transcribe_audio():
-    # Loads AWS S3 bucket information, with preference option
+    '''
+    1. Loads AWS S3 bucket information, with preference option
+    2. Searches for a file matching the desired media format within the script directory
+    3. Uploads file to AWS S3 Bucket
+    4. Creates the Transcription Job
+    5. Parses the JSON Response
+    6. Gives user an option to translate the text (supports over 40 languages)
+    7. Attempts to identify speaker names
+    8. Writes transcribed text to a PDF file
+    9. Identifies when the user said a specific word or phrase, output to a pdf file.
+    10. Give the user the option to remove files to reserve space
+    :return:
+    '''
     s3_bucket_name = get_s3_bucket(None)
-
-    # Searches for a file matching the desired media format within the script directory
     file_name = retrieve_audio()
-
-    # 1. Upload file to AWS S3 Bucket
     file_uri = upload_file(file_name, s3_bucket_name)
 
-    # 2. Create the Transcription Job
     job_name = input('Please enter a transcription job name:').replace(" ", "_")
     transcribe_client = boto3.client('transcribe')
     transcription_response = transcribe_file(file_uri, transcribe_client, job_name)
 
-    # 3. Parse the JSON Response
-    transcribed_data = correlate_speakers(transcription_response)
-
-    # 4. Gives user an option to translate the text (supports over 40 languages)
+    transcribed_data = format_transcription(transcription_response)
     transcribed_data = translate_script(transcription_response, transcribed_data)
-
-    # 5. Attempt to identify speaker names
     speaker_names = identify_speakers(transcribed_data)
 
-    # 6. Writes transcribed text to a PDF file
     transcription_complete = output_transcription(transcribed_data, job_name, speaker_names)
-
-    # 7. Identify when the user said a specific word or phrase, output to a pdf file.
     time_retrievals = recordTimes(speaker_names, job_name, transcription_response)
 
-    # 8. Give the user the option to remove files to reserve space
     if transcription_complete:
         reserve_space(job_name, file_name, s3_bucket_name)
 
 
 def main():
     transcribe_audio()
-
-    # print('Transcribing Powerpoint Slides')
-    # condensor_pdf()
-
 
 if __name__ == '__main__':
     main()
