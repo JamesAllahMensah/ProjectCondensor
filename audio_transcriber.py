@@ -162,12 +162,13 @@ def upload_file(file_name, bucket, object_name=None):
                     'File: {} already exists\nWould you like to overwrite this file (Y/N):'.format(file_name))
                 if error_msg.lower()[0] == 'y':
                     s3_client.delete_object(Bucket=bucket, Key=bucket_file['Key'])
-                    print('File successfully overwritten.')
+                    print('Overwriting file...')
                 else:
                     return None
 
         s3_client.upload_file(file_name, bucket, object_name)
         file_path = ('s3://{}/' + file_name).format(bucket)
+        print('File successfully overwritten.')
     except ClientError as e:
         logging.error(e)
         return None
@@ -242,7 +243,7 @@ def transcribe_file(file_uri, transcribe_client, job_name):
             LanguageCode=getConfiguration("DefaultLanguage"),
             Settings={
                 'ShowSpeakerLabels': True,
-                'MaxSpeakerLabels': 2
+                'MaxSpeakerLabels': 10
             }
         )
     else:
@@ -253,12 +254,12 @@ def transcribe_file(file_uri, transcribe_client, job_name):
             LanguageOptions=getConfiguration("IncludedLanguages"),
             Settings={
                 'ShowSpeakerLabels': True,
-                'MaxSpeakerLabels': 2
+                'MaxSpeakerLabels': 10
             },
             IdentifyLanguage=True
         )
 
-    max_tries = 60
+    max_tries = 100
     while max_tries > 0:
         max_tries -= 1
         job = transcribe_client.get_transcription_job(TranscriptionJobName=job_name)
