@@ -47,7 +47,7 @@
     },
     "French": {
       "Canada": "fr-CA",
-      "Framce": "fr-FR"
+      "France": "fr-FR"
     },
     "Irish": {
       "Ireland": "ga-IE"
@@ -56,7 +56,7 @@
       "United Kingdom": "gd-GB"
     },
     "Hebrew": {
-      "Isreal": "he-IL"
+      "Israel": "he-IL"
     },
     "Hindi": {
       "India": "hi-IN"
@@ -96,7 +96,7 @@
       "China": "zh-CN"
     }
   },
-  "IncludedLanguages": ["en-US"],
+  "IncludedLanguages": ["en-US", "fr-FR","es-ES"],
   "DefaultLanguage": "en-US",
   "MediaFormats": ["mp3", "mp4", "wav", "flac", "ogg", "amr", "webm"],
   "IntroductionCategories": {

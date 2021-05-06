@@ -103,7 +103,9 @@ def retrieve_audio():
                 'Please enter the file index (ex: 1) or the file name of the desired file (ex: {}):'.format(
                     audio_files[0]))
             if selected_file.isnumeric():
-                while int(selected_file) > len(audio_files) or int(selected_file) > 0:
+                print(int(selected_file))
+                print(audio_files)
+                while int(selected_file) > len(audio_files) or int(selected_file) < 0:
                     selected_file = input(
                         'Please enter the file index (ex: 1) or the file name of the desired file (ex: {}):'.format(
                             audio_files[0]))
@@ -240,7 +242,7 @@ def transcribe_file(file_uri, transcribe_client, job_name):
             LanguageCode=getConfiguration("DefaultLanguage"),
             Settings={
                 'ShowSpeakerLabels': True,
-                'MaxSpeakerLabels': getConfiguration('MaxSpeakerLabels')
+                'MaxSpeakerLabels': 2
             }
         )
     else:
@@ -251,7 +253,7 @@ def transcribe_file(file_uri, transcribe_client, job_name):
             LanguageOptions=getConfiguration("IncludedLanguages"),
             Settings={
                 'ShowSpeakerLabels': True,
-                'MaxSpeakerLabels': getConfiguration('MaxSpeakerLabels')
+                'MaxSpeakerLabels': 2
             },
             IdentifyLanguage=True
         )
@@ -268,6 +270,7 @@ def transcribe_file(file_uri, transcribe_client, job_name):
                     f"Download the transcript from\n"
                     f"\t{job['TranscriptionJob']['Transcript']['TranscriptFileUri']}.")
 
+            print(str(job['TranscriptionJob']['Transcript']['TranscriptFileUri']))
             return str(job['TranscriptionJob']['Transcript']['TranscriptFileUri'])
         else:
             print(f"Waiting for {job_name}. Current status is {job_status}.")
@@ -337,7 +340,7 @@ def translate_script(transcription_response, transcribed_data):
                     detected_dialect = list(dialects.keys())[list(dialects.values()).index(dialect)]
                     break
 
-        print('The detected Language is: {}'.format(detected_language))
+        print('The detected Language is: English'.format(detected_language))
         translate_text = input(('Would you like to translate the transcribed audio?'))
         if translate_text[0].lower() == 'y':
             destination_language = input(
@@ -415,7 +418,7 @@ def identify_speakers(full_transcription):
         if not speaker in full_speaker_script:
             full_speaker_script[speaker] = re.sub(r'[^\w\s]', '', transcript)
         else:
-            full_speaker_script[speaker] += re.sub(r'[^\w\s]', '', transcript)
+            full_speaker_script[speaker] += " " + re.sub(r'[^\w\s]', '', transcript)
 
     identified_speakers = {}
     for speaker_script in full_speaker_script:
@@ -543,7 +546,7 @@ def get_time_from_word(transcription_response, speakers, is_watch_word, watch_wo
                                         total_compare_cnt += compare_cnt
                                         if compare_word != segments[segment_index + match_start]['alternatives'][0][
                                             'content'].lower() and compare_cnt > num_suggestions:
-                                            suggestion_index.append(segment_index)  # suggestion_index.append
+                                            suggestion_index.append(segment_index)
                                             segment_index = 0
                                             break
                                         full_suggestion = full_suggestion + " " + \
@@ -639,13 +642,13 @@ def get_time_from_word(transcription_response, speakers, is_watch_word, watch_wo
                 suggestion_list = {}
                 for segment in segments:
                     word = segment['alternatives'][0]['content'].lower()
-                    if word == detection:  # If we did find the word, retrieve the time
+                    if word == detection:
                         start_time = str(time.strftime('%H:%M:%S', time.gmtime(round(float(segment['start_time'])))))
                         raw_start_time = segment['start_time']
                         detected_times.append((detection, start_time, raw_start_time))
                         found = True
 
-                    else:  # If we did not find the word, find a similar word and add it as a suggestion
+                    else:
                         if len(word) == len(detection):
                             char_compare = diff_letters(word, detection)
                             if char_compare == 1 or char_compare == 2 or char_compare == 3:
@@ -809,14 +812,6 @@ def recordTimes(speakers, job_name, transcription_response):
             another_search = input('Would you like to search for another word or phrase?')
             if another_search.lower()[0] != 'y':
                 continue_search = False
-            # Iterate through watch words, pass in true as blocklist , if not none add to recorded_times
-        print('Searching for Watch Words...')
-        watch_words = getConfiguration("WatchWords")
-        for watch_word in watch_words:
-            watch_word_detection = get_time_from_word(transcription_response, speakers, True, watch_word)
-            if watch_word_detection is not None:
-                recorded_times[list(watch_word_detection.keys())[0]] = watch_word_detection[
-                    list(watch_word_detection.keys())[0]]
         record = input('Would you like to record these times (Y/N):')
         if record.lower()[0] == 'y':
             time_segments = list(recorded_times.values())
